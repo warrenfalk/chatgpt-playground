@@ -5,9 +5,33 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vite + React + TS</title>
+    <style>
+      textarea {
+        flex: 1;
+        font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        resize: none;
+      }
+    </style>
   </head>
-  <body>
-    <div id="root"></div>
+  <body style="
+    flex-direction: column;
+    margin: 0;
+    display: flex;
+    min-height: 100vh;
+    align-items: stretch;
+    ">
+    <div id="root" style="
+    flex: 1;
+    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    "></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
