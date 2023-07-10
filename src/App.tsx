@@ -195,6 +195,7 @@ function App() {
   const messages = (rawMessages.length > 0 && rawMessages[rawMessages.length - 1].role === 'assistant') ? [...rawMessages, emptyUserMessage] as Messages : rawMessages;
   return (
     <>
+      <div style={{backgroundColor: 'lightyellow', color: 'gray', padding: 8, textAlign: 'center'}}>Warning! This should only be run locally. It will expose API key</div>
       <div>
         <div>{calcPrice(usage)}</div>
       </div>
