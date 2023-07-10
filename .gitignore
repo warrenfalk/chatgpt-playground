@@ -30,3 +30,4 @@ dist-ssr
 .pnp.*
 .yarn/*
 !.yarn/releases
+keys.json
