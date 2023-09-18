@@ -28,6 +28,10 @@
                 pkgs.yarn
                 pkgs.jq
               ];
+
+              shellHook = ''
+                export PS1="(chatgpt-pg-dev) $PS1"
+              '';              
             };
           };
         }
