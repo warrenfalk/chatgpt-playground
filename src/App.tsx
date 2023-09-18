@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { CSSProperties, useState } from 'react';
 import './App.css'
 import TextareaAutosize from 'react-textarea-autosize';
 import { Configuration, OpenAIApi } from 'openai';
@@ -81,6 +81,17 @@ function Button({text, onClick, disabled = false}: ButtonProps) {
   )
 }
 
+const rowNameStyle: CSSProperties = {
+  flexBasis: 100,
+  textTransform: 'uppercase',
+  fontWeight: 'bold',
+  fontSize: 12,
+  letterSpacing: '.08em',
+  padding: 12,
+  lineHeight: '20px',
+  cursor: 'pointer',
+}
+
 type RoleSelectProps = {
   role: Role;
   onChange: (v: Role) => void;
@@ -88,16 +99,7 @@ type RoleSelectProps = {
 function RoleSelect({role, onChange}: RoleSelectProps) {
   return (
     <div
-      style={{
-        flexBasis: 100,
-        textTransform: 'uppercase',
-        fontWeight: 'bold',
-        fontSize: 12,
-        letterSpacing: '.08em',
-        padding: 12,
-        lineHeight: '20px',
-        cursor: 'pointer',
-      }}
+      style={rowNameStyle}
       onClick={() => {
         const nextRole = {'system': 'user', 'user': 'assistant', 'assistant': 'system', 'function': 'user'}[role] as Role;
         onChange(nextRole);
@@ -129,6 +131,20 @@ function MessageEntry({message, onChange}: MessageEntryProps) {
       <div>
         <Button text="🗑️" onClick={() => onChange?.(null)} />
       </div>
+    </div>
+  )
+}
+
+type FunctionsEntryProps = {
+  functions: string;
+  onChange: (next: string) => void;
+};
+function FunctionsEntry({functions, onChange}: FunctionsEntryProps) {
+  const [funcsExpanded, setFuncsExpanded] = useState<boolean>(() => false);
+  return (
+    <div style={{flex: 1, display: 'flex', padding: 12, gap: 12, borderBottomColor: 'gray', borderBottomWidth: 1, borderBottomStyle: 'solid'}}>
+      <div style={rowNameStyle}>Functions</div>
+      <TextEntry value={functions} onChange={v => onChange?.(v)}/>
     </div>
   )
 }
@@ -211,7 +227,7 @@ const models: Models = {
 
 function calcPrice(usage: Usage) {
   const modelNames = Object.keys(usage) as ModelType[];
-  return modelNames.reduce((total, modelId) => {
+  return modelNames.reduce((_total, modelId) => {
     const modelUsage = usage[modelId] || zeroUsage;
     const modelPricing = models[modelId].pricing;
     const amount =
@@ -310,6 +326,7 @@ function App() {
       <div>
         <div>{calcPrice(usage)}</div>
       </div>
+      <FunctionsEntry functions={availFuncs} onChange={setAvailFuncs} />
       {messages.map((m, i) => (
         <MessageEntry
           key={i}
