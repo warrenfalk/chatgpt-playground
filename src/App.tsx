@@ -34,8 +34,9 @@ type Messages = readonly Message[];
 type TextEntryProps = {
   value: string;
   onChange: (v: string) => void;
+  onCtrlEnter?: () => void;
 }
-function TextEntry({value, onChange}: TextEntryProps) {
+function TextEntry({value, onChange, onCtrlEnter}: TextEntryProps) {
   return (
     <TextareaAutosize
       style={{
@@ -48,6 +49,11 @@ function TextEntry({value, onChange}: TextEntryProps) {
       }}
       value={value}
       onChange={e => onChange(e.target.value)}
+      onKeyDown={e => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+          onCtrlEnter?.();
+        }
+      }}
     />
   )
 }
@@ -111,16 +117,22 @@ function RoleSelect({role, onChange}: RoleSelectProps) {
 
 type MessageEntryProps = {
   message: Message;
-  onChange?: (v: Message | null) => void;
+  onChange?: (v: Message) => void;
+  onDelete?: () => void;
+  onSubmit?: () => void;
 }
-function MessageEntry({message, onChange}: MessageEntryProps) {
+function MessageEntry({message, onChange, onDelete, onSubmit}: MessageEntryProps) {
   const {role: author} = message;
   return (
     <div style={{flex: 1, display: 'flex', padding: 12, gap: 12, borderBottomColor: 'gray', borderBottomWidth: 1, borderBottomStyle: 'solid'}}>
       <RoleSelect role={author} onChange={v => onChange?.({...message, role: v})}/>
       {message.content !== undefined ?
       (
-        <TextEntry value={message.content} onChange={v => onChange?.({role: author, content: v})}/>
+        <TextEntry
+          value={message.content}
+          onCtrlEnter={() => onSubmit?.()}
+          onChange={v => onChange?.({role: author, content: v})}
+        />
       ) : (
         <div>
           <div>function call</div>
@@ -129,7 +141,9 @@ function MessageEntry({message, onChange}: MessageEntryProps) {
         </div>
       )}
       <div>
-        <Button text="🗑️" onClick={() => onChange?.(null)} />
+        {onDelete ? (
+          <Button text="🗑️" onClick={() => onDelete?.()} />
+        ) : null}
       </div>
     </div>
   )
@@ -244,8 +258,8 @@ function exists<T>(n: null | undefined | T): n is T {
 async function submitToModel(messages: Messages, usage: Usage) {
   console.log('requesting...');
   const response = await openai.createChatCompletion({
-    //model: 'gpt-4-0613',
-    model: 'gpt-3.5-turbo-0613',
+    model: 'gpt-4-0613',
+    //model: 'gpt-3.5-turbo-0613',
     messages: messages.slice(),
     /*
     function_call: {name: "list_errors"},
@@ -292,7 +306,8 @@ async function submitToModel(messages: Messages, usage: Usage) {
   }
   const msgResponse = response.data.choices[0]?.message;
   if (!msgResponse) {
-    return
+    console.log("Response without message", JSON.stringify(response));
+    throw new Error('no message response');
   }
   const role = msgResponse.role;
   const fc = msgResponse.function_call || undefined;
@@ -315,10 +330,27 @@ async function submitToModel(messages: Messages, usage: Usage) {
 function App() {
   const [usage, setUsage] = useState<Usage>({});
   const [waiting, setWaiting] = useState<boolean>(() => false);
-  const [rawMessages, setMessages] = useState<Messages>(() => initial);
+  const [messages, setMessages] = useState<Messages>(() => initial);
   const [availFuncs, setAvailFuncs] = useState<string>(() => "");
   const [error, setError] = useState<string>();
-  const messages = (rawMessages.length > 0 && rawMessages[rawMessages.length - 1].role === 'assistant') ? [...rawMessages, emptyUserMessage] as Messages : rawMessages;
+  
+  async function submit() {
+    try {
+      setWaiting(true);
+      const result = await submitToModel(messages, usage)
+      setUsage(result.usage);
+      setMessages(result.messages);
+    }
+    catch (e) {
+      console.error(e);
+      const es = errorToString(e);
+      setError(es);
+    }
+    finally {
+      setWaiting(false);
+    }
+  }
+
   return (
     <>
       {/*<pre>{JSON.stringify(messages, null, 2)}</pre>*/}
@@ -327,17 +359,44 @@ function App() {
         <div>{calcPrice(usage)}</div>
       </div>
       <FunctionsEntry functions={availFuncs} onChange={setAvailFuncs} />
-      {messages.map((m, i) => (
-        <MessageEntry
-          key={i}
-          message={m}
-          onChange={m => {
-            // replace the message being edited
-            const next = messages.map((pm, pi) => pi === i ? m : pm).filter(exists);
-            setMessages(next);
-          }}
-        />
-      ))}
+      <>
+        {...messages.map((m, i) => (
+          <MessageEntry
+            key={i}
+            message={m}
+            onSubmit={() => {
+              void submit();
+            }}
+            onDelete={() => {
+              const next = messages.filter((_, pi) => pi !== i);
+              setMessages(next);
+            }}
+            onChange={m => {
+              // replace the message being edited
+              const next = (i === messages.length - 1 && m.content === '' && m.role === 'user')
+                ? messages.filter((_, pi) => pi !== i)
+                : messages.map((pm, pi) => pi === i ? m : pm);
+              setMessages(next);
+            }}
+          />
+        ))}
+        {(messages.length > 0 && messages[messages.length - 1].role !== 'user') ? (
+          <MessageEntry
+            key={messages.length}
+            message={{role: 'user', content: ''}}
+            onSubmit={() => {
+              void submit();
+            }}
+            onChange={m => {
+              if (m.content === '' && m.role === 'user') {
+                return;
+              }
+              const next = [...messages, m];
+              setMessages(next);
+            }}
+          />
+        ) : null}
+      </>
       {error ? (
         <div style={{color: 'red'}}>
           {error}
@@ -348,22 +407,7 @@ function App() {
           disabled={waiting}
           text="Submit"
           onClick={() => {
-            setWaiting(true);
-            submitToModel(messages, usage)
-            .then((result) => {
-              if (result) {
-                setUsage(result.usage);
-                setMessages(result.messages);
-              }
-            })
-            .catch(e => {
-              console.error(e);
-              const es = errorToString(e);
-              setError(es);
-            })
-            .finally(() => {
-              setWaiting(false);
-            })
+            void submit();
           }}
         />
       </div>
